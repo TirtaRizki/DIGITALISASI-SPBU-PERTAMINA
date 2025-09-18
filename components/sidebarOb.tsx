@@ -21,6 +21,7 @@ import {
   Fuel,
   CalendarCheck,
 } from "lucide-react";
+import path from "path";
 
 // Format role: ADMIN_PUSAT -> Admin Pusat
 function formatRole(role: string) {
@@ -75,17 +76,33 @@ export default function Sidebar() {
   };
 
   const menuItems = [
-    { name: "Dashboard", path: "/operator/dashboard", icon: LayoutDashboard },
+    { name: "Dashboard", path: "/ob/dashboard", icon: LayoutDashboard },
     {
       name: "Absensi",
-      path: "/operator/employee/attendances",
+      path: "/ob/employee/attendances",
       icon: CalendarCheck,
     },
-    { name: "Izin", path: "/operator/employee/absences", icon: CalendarCheck },
-    { name: "Checklist Mushola", path: "/ob/checklist/mushola", icon: ClipboardCheck },
-    { name: "Checklist Toilet", path: "/ob/checklist/toilet", icon: ClipboardCheck },
-    { name: "Checklist Kantor", path: "/ob/checklist/kantor", icon: ClipboardCheck },
-    { name: "Checklist Taman", path: "/ob/checklist/taman", icon: ClipboardCheck },
+    { name: "Izin", path: "/ob/employee/absences", icon: CalendarCheck },
+    {
+      name: "Checklist Kantor",
+      path: "/ob/checklist/kantor",
+      icon: ClipboardCheck,
+    },
+    {
+      name: "Checklist Mushola",
+      path: "/ob/checklist/mushola",
+      icon: ClipboardCheck,
+    },
+    {
+      name: "Checklist Taman",
+      path: "/ob/checklist/taman",
+      icon: ClipboardCheck,
+    },
+    {
+      name: "Checklist Toilet",
+      path: "/ob/checklist/toilet",
+      icon: ClipboardCheck,
+    },
   ];
 
   return (

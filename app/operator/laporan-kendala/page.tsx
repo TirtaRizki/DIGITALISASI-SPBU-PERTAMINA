@@ -22,6 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // --- PERBAIKAN 1: INTERFACE DIBUAT LEBIH FLEKSIBEL ---
 interface IssueReport {
@@ -72,7 +75,6 @@ export default function IssueReportPage() {
 
   const openEdit = (report: IssueReport) => {
     setEditing(report);
-    // --- PERBAIKAN 2: CEK KEDUA KEMUNGKINAN NAMA FIELD TANGGAL ---
     const reportDate = report.tanggalLaporan || report.tanggal;
     setForm({
       ...report,
@@ -86,7 +88,7 @@ export default function IssueReportPage() {
     if (form.tanggal && !isNaN(new Date(form.tanggal).getTime())) {
       formData.append("tanggal", new Date(form.tanggal).toISOString());
     } else {
-      formData.append("tanggal", "");
+      formData.append("tanggal", new Date().toISOString()); // Default ke waktu sekarang jika tidak valid
     }
     formData.append("shift", form.shift || "");
     formData.append("judulLaporan", form.judulLaporan || "");
@@ -102,11 +104,7 @@ export default function IssueReportPage() {
       setOpenAddModal(false);
       fetchReports();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal tambah data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal tambah data!", "error");
     }
   };
 
@@ -120,22 +118,14 @@ export default function IssueReportPage() {
       setEditing(null);
       fetchReports();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update data!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin?",
-      text: "Data akan dihapus permanen!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin?", text: "Data akan dihapus permanen!", icon: "warning",
+      showCancelButton: true, confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
     try {
@@ -143,56 +133,76 @@ export default function IssueReportPage() {
       Swal.fire("Berhasil", "Data berhasil dihapus!", "success");
       fetchReports();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus data!", "error");
     }
+  };
+
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF untuk Laporan Masalah ---
+  const handleExportPDF = () => {
+    if (reports.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+    
+    const doc = new jsPDF();
+    const spbu = reports[0]?.spbu?.code_spbu || "N/A";
+
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Laporan Masalah (Issue Report)", 105, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`SPBU: ${spbu}`, 14, 25);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, doc.internal.pageSize.getWidth() - 14, 25, { align: 'right' });
+    
+    const head = [["ID", "Tanggal", "Shift", "User", "Judul Laporan", "Deskripsi"]];
+    const body = reports.map(report => {
+        const reportDate = report.tanggalLaporan || report.tanggal;
+        return [
+            report.id,
+            reportDate ? new Date(reportDate).toLocaleString("id-ID") : "-",
+            report.shift,
+            report.user?.name || "-",
+            report.judulLaporan,
+            report.deskripsiLaporan
+        ];
+    });
+
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fontStyle: 'bold', fillColor: [220, 220, 220], textColor: 0 },
+      columnStyles: {
+        0: { cellWidth: 10 }, // ID
+        1: { cellWidth: 30 }, // Tanggal
+        2: { cellWidth: 15 }, // Shift
+        3: { cellWidth: 25 }, // User
+        4: { cellWidth: 40 }, // Judul
+        5: { cellWidth: 'auto' }, // Deskripsi
+      }
+    });
+
+    doc.save(`Laporan_Masalah_${spbu}.pdf`);
   };
 
   const renderFormFields = () => (
     <>
-      <div>
-        <label>Tanggal Laporan</label>
-        <Input
-          type="datetime-local"
-          value={form.tanggal || ""}
-          onChange={(e) => setField("tanggal", e.target.value)}
-        />
-      </div>
+      <div><label>Tanggal Laporan</label><Input type="datetime-local" value={form.tanggal || ""} onChange={(e) => setField("tanggal", e.target.value)} /></div>
       <div>
         <label>Shift</label>
-        <Select
-          value={form.shift || ""}
-          onValueChange={(v) => setField("shift", v)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Pilih Shift" />
-          </SelectTrigger>
+        <Select value={form.shift || ""} onValueChange={(v) => setField("shift", v)}>
+          <SelectTrigger><SelectValue placeholder="Pilih Shift" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="PAGI">PAGI</SelectItem>
-            <SelectItem value="SIANG">SIANG</SelectItem>
-            <SelectItem value="MALAM">MALAM</SelectItem>
+            <SelectItem value="PAGI">PAGI</SelectItem><SelectItem value="SIANG">SIANG</SelectItem><SelectItem value="MALAM">MALAM</SelectItem>
           </SelectContent>
         </Select>
       </div>
-      <div className="col-span-2">
-        <label>Judul Laporan</label>
-        <Input
-          placeholder="Cth: Lampu kanopi mati"
-          value={form.judulLaporan || ""}
-          onChange={(e) => setField("judulLaporan", e.target.value)}
-        />
-      </div>
-      <div className="col-span-2">
-        <label>Deskripsi Laporan</label>
-        <Textarea
-          placeholder="Jelaskan masalah secara rinci..."
-          value={form.deskripsiLaporan || ""}
-          onChange={(e) => setField("deskripsiLaporan", e.target.value)}
-        />
-      </div>
+      <div className="col-span-2"><label>Judul Laporan</label><Input placeholder="Cth: Lampu kanopi mati" value={form.judulLaporan || ""} onChange={(e) => setField("judulLaporan", e.target.value)} /></div>
+      <div className="col-span-2"><label>Deskripsi Laporan</label><Textarea placeholder="Jelaskan masalah secara rinci..." value={form.deskripsiLaporan || ""} onChange={(e) => setField("deskripsiLaporan", e.target.value)} /></div>
     </>
   );
 
@@ -200,62 +210,31 @@ export default function IssueReportPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Laporan Masalah</h1>
-        <Button onClick={openAdd}>+ Buat Laporan</Button>
+        {/* --- TAMBAHAN BARU: Tombol Export --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={openAdd}>+ Buat Laporan</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Laporan Masalah</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Laporan Masalah</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : reports.length === 0 ? (
-            <p>Belum ada laporan masalah.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : reports.length === 0 ? (<p>Belum ada laporan masalah.</p>) : (
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>SPBU</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Tanggal Laporan</TableHead>
-                  <TableHead>Shift</TableHead>
-                  <TableHead>Judul Laporan</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>SPBU</TableHead><TableHead>User</TableHead><TableHead>Tanggal Laporan</TableHead><TableHead>Shift</TableHead><TableHead>Judul Laporan</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
               <TableBody>
                 {reports.map((report) => {
-                  // --- PERBAIKAN 3: CEK KEDUA KEMUNGKINAN NAMA FIELD TANGGAL ---
                   const reportDate = report.tanggalLaporan || report.tanggal;
                   return (
                     <TableRow key={report.id}>
-                      <TableCell>{report.id}</TableCell>
-                      <TableCell>{report.spbu?.code_spbu}</TableCell>
+                      <TableCell>{report.id}</TableCell><TableCell>{report.spbu?.code_spbu}</TableCell>
                       <TableCell>{report.user?.name}</TableCell>
-                      <TableCell>
-                        {reportDate
-                          ? new Date(reportDate).toLocaleString("id-ID")
-                          : "-"}
-                      </TableCell>
-                      <TableCell>{report.shift}</TableCell>
-                      <TableCell>{report.judulLaporan}</TableCell>
+                      <TableCell>{reportDate ? new Date(reportDate).toLocaleString("id-ID") : "-"}</TableCell>
+                      <TableCell>{report.shift}</TableCell><TableCell>{report.judulLaporan}</TableCell>
                       <TableCell className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEdit(report)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(report.id)}
-                        >
-                          Delete
-                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(report)}>Edit</Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(report.id)}>Delete</Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -266,51 +245,8 @@ export default function IssueReportPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
-      {openAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-semibold mb-4">
-              Buat Laporan Masalah Baru
-            </h2>
-            <div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto p-2">
-              {renderFormFields()}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setOpenAddModal(false)}>
-                Batal
-              </Button>
-              <Button onClick={handleAdd}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edit */}
-      {openEditModal && editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-semibold mb-4">
-              Edit Laporan Masalah
-            </h2>
-            <div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto p-2">
-              {renderFormFields()}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOpenEditModal(false);
-                  setEditing(null);
-                }}
-              >
-                Batal
-              </Button>
-              <Button onClick={handleUpdate}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {openAddModal && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto"><div className="bg-white rounded-2xl p-6 w-full max-w-2xl"><h2 className="text-xl font-semibold mb-4">Buat Laporan Masalah Baru</h2><div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto p-2">{renderFormFields()}</div><div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setOpenAddModal(false)}>Batal</Button><Button onClick={handleAdd}>Simpan</Button></div></div></div>)}
+      {openEditModal && editing && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto"><div className="bg-white rounded-2xl p-6 w-full max-w-2xl"><h2 className="text-xl font-semibold mb-4">Edit Laporan Masalah</h2><div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto p-2">{renderFormFields()}</div><div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => { setOpenEditModal(false); setEditing(null); }}>Batal</Button><Button onClick={handleUpdate}>Simpan</Button></div></div></div>)}
     </div>
   );
 }
