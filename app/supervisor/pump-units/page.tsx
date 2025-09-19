@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Nozzle {
   id: number;
@@ -80,11 +83,7 @@ export default function PumpUnitsPage() {
       setOpenAddModal(false);
       fetchPumpUnits();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal tambah data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal tambah data!", "error");
     }
   };
 
@@ -99,22 +98,14 @@ export default function PumpUnitsPage() {
       setEditing(null);
       fetchPumpUnits();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update data!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin?",
-      text: "Data akan dihapus permanen!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin?", text: "Data akan dihapus permanen!", icon: "warning",
+      showCancelButton: true, confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
     try {
@@ -122,12 +113,52 @@ export default function PumpUnitsPage() {
       Swal.fire("Berhasil", "Data berhasil dihapus!", "success");
       fetchPumpUnits();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus data!", "error");
     }
+  };
+  
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (pumpUnits.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Daftar Pump Units", 105, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 25);
+    
+    const head = [["ID", "Kode Pompa", "Nozzle", "Dibuat"]];
+    const body = pumpUnits.map(p => {
+        const nozzleList = p.nozzle.length > 0
+            ? p.nozzle.map(n => `${n.kodeNozzle} (${n.tank?.fuel_type || "-"})`).join("\n")
+            : "-";
+        return [
+            p.id,
+            p.kodePompa,
+            nozzleList,
+            new Date(p.createdAt).toLocaleString('id-ID')
+        ];
+    });
+
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+      columnStyles: {
+        2: { cellWidth: 'auto' }, // Kolom Nozzle
+      }
+    });
+
+    doc.save(`Daftar_Pump_Units.pdf`);
   };
 
   const renderFormFields = () => (
@@ -145,27 +176,22 @@ export default function PumpUnitsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Pump Units</h1>
-        <Button onClick={openAdd}>+ Tambah Data</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN DI SINI --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={openAdd}>+ Tambah Data</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Pump Units</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Pump Units</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : pumpUnits.length === 0 ? (
-            <p>Belum ada data pump units.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : pumpUnits.length === 0 ? (<p>Belum ada data pump units.</p>) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Kode Pompa</TableHead>
-                  <TableHead>Nozzle</TableHead>
-                  <TableHead>Dibuat</TableHead>
-                  <TableHead>Aksi</TableHead>
+                  <TableHead>ID</TableHead><TableHead>Kode Pompa</TableHead>
+                  <TableHead>Nozzle</TableHead><TableHead>Dibuat</TableHead><TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,28 +208,12 @@ export default function PumpUnitsPage() {
                             </li>
                           ))}
                         </ul>
-                      ) : (
-                        <span>-</span>
-                      )}
+                      ) : ( <span>-</span> )}
                     </TableCell>
-                    <TableCell>
-                      {new Date(p.createdAt).toLocaleString()}
-                    </TableCell>
+                    <TableCell>{new Date(p.createdAt).toLocaleString()}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(p)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDelete(p.id)}
-                      >
-                        Delete
-                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openEdit(p)}>Edit</Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(p.id)}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -213,43 +223,8 @@ export default function PumpUnitsPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
-      {openAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Tambah Pump Unit</h2>
-            {renderFormFields()}
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setOpenAddModal(false)}>
-                Batal
-              </Button>
-              <Button onClick={handleAdd}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edit */}
-      {openEditModal && editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Edit Pump Unit</h2>
-            {renderFormFields()}
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOpenEditModal(false);
-                  setEditing(null);
-                }}
-              >
-                Batal
-              </Button>
-              <Button onClick={handleUpdate}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {openAddModal && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50"><div className="bg-white rounded-2xl p-6 w-full max-w-lg"><h2 className="text-xl font-semibold mb-4">Tambah Pump Unit</h2>{renderFormFields()}<div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setOpenAddModal(false)}>Batal</Button><Button onClick={handleAdd}>Simpan</Button></div></div></div>)}
+      {openEditModal && editing && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50"><div className="bg-white rounded-2xl p-6 w-full max-w-lg"><h2 className="text-xl font-semibold mb-4">Edit Pump Unit</h2>{renderFormFields()}<div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => { setOpenEditModal(false); setEditing(null); }}>Batal</Button><Button onClick={handleUpdate}>Simpan</Button></div></div></div>)}
     </div>
   );
 }

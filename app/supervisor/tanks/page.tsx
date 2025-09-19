@@ -22,6 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Tank {
   id: number;
@@ -138,11 +141,52 @@ export default function TanksPage() {
     setCurrentVolume("");
   };
 
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (tanks.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Daftar Tanks", 105, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 25);
+    
+    const head = [["ID", "Code Tank", "Fuel Type", "Capacity (L)", "Current Volume (L)"]];
+    const body = tanks.map(tank => [
+        tank.id,
+        tank.code_tank,
+        tank.fuel_type.replace(/_/g, " "),
+        tank.capacity.toLocaleString('id-ID'),
+        tank.current_volume.toLocaleString('id-ID')
+    ]);
+
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+    });
+
+    doc.save(`Daftar_Tanks.pdf`);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Daftar Tanks</h1>
-        <Button onClick={() => setOpenAddModal(true)}>+ Tambah Tank</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN DI SINI --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={() => setOpenAddModal(true)}>+ Tambah Tank</Button>
+        </div>
       </div>
 
       <Card>
@@ -208,20 +252,16 @@ export default function TanksPage() {
               value={codeTank.toUpperCase()}
               onChange={(e) => setCodeTank(e.target.value)}
             />
-
             <Select value={fuelType} onValueChange={(val) => setFuelType(val)}>
               <SelectTrigger>
                 <SelectValue placeholder="Pilih Fuel Type" />
               </SelectTrigger>
               <SelectContent>
                 {fuelTypes.map((ft) => (
-                  <SelectItem key={ft} value={ft}>
-                    {ft}
-                  </SelectItem>
+                  <SelectItem key={ft} value={ft}>{ft}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-
             <Input
               type="number"
               placeholder="Capacity"
@@ -256,7 +296,6 @@ export default function TanksPage() {
                 setEditTank({ ...editTank, code_tank: e.target.value })
               }
             />
-
             <Select
               value={editTank.fuel_type}
               onValueChange={(val) =>
@@ -268,13 +307,10 @@ export default function TanksPage() {
               </SelectTrigger>
               <SelectContent>
                 {fuelTypes.map((ft) => (
-                  <SelectItem key={ft} value={ft}>
-                    {ft}
-                  </SelectItem>
+                  <SelectItem key={ft} value={ft}>{ft}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-
             <Input
               type="number"
               placeholder="Capacity"

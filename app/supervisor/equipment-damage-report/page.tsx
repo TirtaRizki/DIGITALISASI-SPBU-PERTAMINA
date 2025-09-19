@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface EquipmentDamage {
   id: number;
@@ -88,14 +91,9 @@ export default function EquipmentDamageReportPage() {
 
   // reset add form
   const resetAddForm = () => {
-    setA_NamaUnit("");
-    setA_Deskripsi("");
-    setA_Tindakan("");
-    setA_Penanggung("");
-    setA_TglKerusakan("");
-    setA_TglPemberitahuan("");
-    setA_TglPerbaikan("");
-    setA_TglSelesai("");
+    setA_NamaUnit(""); setA_Deskripsi(""); setA_Tindakan("");
+    setA_Penanggung(""); setA_TglKerusakan(""); setA_TglPemberitahuan("");
+    setA_TglPerbaikan(""); setA_TglSelesai("");
   };
 
   const handleAdd = async () => {
@@ -103,55 +101,30 @@ export default function EquipmentDamageReportPage() {
       Swal.fire("Oops!", "Nama unit & deskripsi wajib diisi!", "warning");
       return;
     }
-
     try {
       const payload = {
-        namaUnit: a_namaUnit,
-        deskripsiKerusakan: a_deskripsi,
-        tindakanYangDilakukan: a_tindakan,
-        penanggungJawabPerbaikan: a_penanggung,
-        tanggalKerusakan: toISOStringOrNull(a_tglKerusakan),
-        tanggalPemberitahuan: toISOStringOrNull(a_tglPemberitahuan),
-        tanggalPerbaikan: toISOStringOrNull(a_tglPerbaikan),
+        namaUnit: a_namaUnit, deskripsiKerusakan: a_deskripsi, tindakanYangDilakukan: a_tindakan,
+        penanggungJawabPerbaikan: a_penanggung, tanggalKerusakan: toISOStringOrNull(a_tglKerusakan),
+        tanggalPemberitahuan: toISOStringOrNull(a_tglPemberitahuan), tanggalPerbaikan: toISOStringOrNull(a_tglPerbaikan),
         tanggalPerbaikanSelesai: toISOStringOrNull(a_tglSelesai),
       };
-
-      await API.post("/supervisor/equipment-damage-report", payload, {
-        headers: { "Content-Type": "application/json" },
-      });
-
+      await API.post("/supervisor/equipment-damage-report", payload, { headers: { "Content-Type": "application/json" } });
       Swal.fire("Berhasil", "Laporan berhasil ditambahkan!", "success");
-      resetAddForm();
-      setOpenAdd(false);
-      fetchReports();
+      resetAddForm(); setOpenAdd(false); fetchReports();
     } catch (err: any) {
       console.error("add error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal tambah data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal tambah data!", "error");
     }
   };
 
   const openEditModal = (r: EquipmentDamage) => {
     setEditing(r);
-    setE_NamaUnit(r.namaUnit);
-    setE_Deskripsi(r.deskripsiKerusakan);
-    setE_Tindakan(r.tindakanYangDilakukan);
-    setE_Penanggung(r.penanggungJawabPerbaikan);
-    setE_TglKerusakan(
-      r.tanggalKerusakan ? r.tanggalKerusakan.slice(0, 16) : ""
-    );
-    setE_TglPemberitahuan(
-      r.tanggalPemberitahuan ? r.tanggalPemberitahuan.slice(0, 16) : ""
-    );
-    setE_TglPerbaikan(
-      r.tanggalPerbaikan ? r.tanggalPerbaikan.slice(0, 16) : ""
-    );
-    setE_TglSelesai(
-      r.tanggalPerbaikanSelesai ? r.tanggalPerbaikanSelesai.slice(0, 16) : ""
-    );
+    setE_NamaUnit(r.namaUnit); setE_Deskripsi(r.deskripsiKerusakan);
+    setE_Tindakan(r.tindakanYangDilakukan); setE_Penanggung(r.penanggungJawabPerbaikan);
+    setE_TglKerusakan(r.tanggalKerusakan ? r.tanggalKerusakan.slice(0, 16) : "");
+    setE_TglPemberitahuan(r.tanggalPemberitahuan ? r.tanggalPemberitahuan.slice(0, 16) : "");
+    setE_TglPerbaikan(r.tanggalPerbaikan ? r.tanggalPerbaikan.slice(0, 16) : "");
+    setE_TglSelesai(r.tanggalPerbaikanSelesai ? r.tanggalPerbaikanSelesai.slice(0, 16) : "");
     setOpenEdit(true);
   };
 
@@ -161,140 +134,121 @@ export default function EquipmentDamageReportPage() {
       Swal.fire("Oops!", "Nama unit & deskripsi wajib diisi!", "warning");
       return;
     }
-
     try {
       const payload = {
-        namaUnit: e_namaUnit,
-        deskripsiKerusakan: e_deskripsi,
-        tindakanYangDilakukan: e_tindakan,
-        penanggungJawabPerbaikan: e_penanggung,
-        tanggalKerusakan: toISOStringOrNull(e_tglKerusakan),
-        tanggalPemberitahuan: toISOStringOrNull(e_tglPemberitahuan),
-        tanggalPerbaikan: toISOStringOrNull(e_tglPerbaikan),
+        namaUnit: e_namaUnit, deskripsiKerusakan: e_deskripsi, tindakanYangDilakukan: e_tindakan,
+        penanggungJawabPerbaikan: e_penanggung, tanggalKerusakan: toISOStringOrNull(e_tglKerusakan),
+        tanggalPemberitahuan: toISOStringOrNull(e_tglPemberitahuan), tanggalPerbaikan: toISOStringOrNull(e_tglPerbaikan),
         tanggalPerbaikanSelesai: toISOStringOrNull(e_tglSelesai),
       };
-
-      await API.put(
-        `/supervisor/equipment-damage-report/${editing.id}`,
-        payload
-      );
-
+      await API.put(`/supervisor/equipment-damage-report/${editing.id}`, payload);
       Swal.fire("Berhasil", "Laporan berhasil diupdate!", "success");
-      setOpenEdit(false);
-      setEditing(null);
-      fetchReports();
+      setOpenEdit(false); setEditing(null); fetchReports();
     } catch (err: any) {
       console.error("update error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update data!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin hapus?",
-      text: "Data akan dihapus permanen!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin hapus?", text: "Data akan dihapus permanen!", icon: "warning",
+      showCancelButton: true, confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
-
     try {
       await API.delete(`/supervisor/equipment-damage-report/${id}`);
       Swal.fire("Berhasil", "Data berhasil dihapus!", "success");
       fetchReports();
     } catch (err: any) {
       console.error("delete error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus data!", "error");
     }
+  };
+  
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (reports.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const spbu = reports[0]?.spbu?.code_spbu || "N/A";
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Laporan Kerusakan Peralatan", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`SPBU: ${spbu}`, 14, 25);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, doc.internal.pageSize.getWidth() - 14, 25, { align: 'right' });
+
+    const head = [["Unit", "Deskripsi", "Tindakan", "PJ", "Tgl Rusak", "Tgl Lapor", "Tgl Perbaikan", "Tgl Selesai"]];
+    const body = reports.map(r => {
+        const formatDate = (dateStr: string | null) => dateStr ? new Date(dateStr).toLocaleString('id-ID') : "-";
+        return [
+            r.namaUnit,
+            r.deskripsiKerusakan,
+            r.tindakanYangDilakukan,
+            r.penanggungJawabPerbaikan,
+            formatDate(r.tanggalKerusakan),
+            formatDate(r.tanggalPemberitahuan),
+            formatDate(r.tanggalPerbaikan),
+            formatDate(r.tanggalPerbaikanSelesai),
+        ];
+    });
+
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+      columnStyles: {
+        1: { cellWidth: 'auto' }, // Deskripsi
+        2: { cellWidth: 'auto' }, // Tindakan
+      }
+    });
+
+    doc.save(`Laporan_Kerusakan_Peralatan_${spbu}.pdf`);
   };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Equipment Damage Report</h1>
-        <Button onClick={() => setOpenAdd(true)}>+ Tambah Laporan</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={() => setOpenAdd(true)}>+ Tambah Laporan</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Equipment Damage Report</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Equipment Damage Report</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : reports.length === 0 ? (
-            <p>Belum ada data.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : reports.length === 0 ? (<p>Belum ada data.</p>) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>SPBU</TableHead>
-                  <TableHead>Nama Unit</TableHead>
-                  <TableHead>Deskripsi</TableHead>
-                  <TableHead>Tindakan</TableHead>
-                  <TableHead>PJ</TableHead>
-                  <TableHead>Tgl Kerusakan</TableHead>
-                  <TableHead>Tgl Pemberitahuan</TableHead>
-                  <TableHead>Tgl Perbaikan</TableHead>
-                  <TableHead>Tgl Selesai</TableHead>
-                  <TableHead>Aksi</TableHead>
+                  <TableHead>ID</TableHead><TableHead>SPBU</TableHead><TableHead>Nama Unit</TableHead><TableHead>Deskripsi</TableHead><TableHead>Tindakan</TableHead><TableHead>PJ</TableHead>
+                  <TableHead>Tgl Kerusakan</TableHead><TableHead>Tgl Pemberitahuan</TableHead><TableHead>Tgl Perbaikan</TableHead><TableHead>Tgl Selesai</TableHead><TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reports.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell>{r.id}</TableCell>
-                    <TableCell>{r.spbu.code_spbu}</TableCell>
-                    <TableCell>{r.namaUnit}</TableCell>
-                    <TableCell>{r.deskripsiKerusakan}</TableCell>
-                    <TableCell>{r.tindakanYangDilakukan}</TableCell>
-                    <TableCell>{r.penanggungJawabPerbaikan}</TableCell>
-                    <TableCell>
-                      {r.tanggalKerusakan
-                        ? new Date(r.tanggalKerusakan).toLocaleString()
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {r.tanggalPemberitahuan
-                        ? new Date(r.tanggalPemberitahuan).toLocaleString()
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {r.tanggalPerbaikan
-                        ? new Date(r.tanggalPerbaikan).toLocaleString()
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {r.tanggalPerbaikanSelesai
-                        ? new Date(r.tanggalPerbaikanSelesai).toLocaleString()
-                        : "-"}
-                    </TableCell>
+                    <TableCell>{r.id}</TableCell><TableCell>{r.spbu.code_spbu}</TableCell><TableCell>{r.namaUnit}</TableCell><TableCell>{r.deskripsiKerusakan}</TableCell><TableCell>{r.tindakanYangDilakukan}</TableCell><TableCell>{r.penanggungJawabPerbaikan}</TableCell>
+                    <TableCell>{r.tanggalKerusakan ? new Date(r.tanggalKerusakan).toLocaleString() : "-"}</TableCell>
+                    <TableCell>{r.tanggalPemberitahuan ? new Date(r.tanggalPemberitahuan).toLocaleString() : "-"}</TableCell>
+                    <TableCell>{r.tanggalPerbaikan ? new Date(r.tanggalPerbaikan).toLocaleString() : "-"}</TableCell>
+                    <TableCell>{r.tanggalPerbaikanSelesai ? new Date(r.tanggalPerbaikanSelesai).toLocaleString() : "-"}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditModal(r)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(r.id)}
-                      >
-                        Delete
-                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openEditModal(r)}>Edit</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(r.id)}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -304,164 +258,44 @@ export default function EquipmentDamageReportPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
       {openAdd && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-6">
-              Tambah Laporan Kerusakan
-            </h2>
-
+            <h2 className="text-xl font-semibold mb-6">Tambah Laporan Kerusakan</h2>
             <div className="space-y-3">
-              <Input
-                placeholder="Nama Unit"
-                value={a_namaUnit}
-                onChange={(e) => setA_NamaUnit(e.target.value)}
-              />
-              <Input
-                placeholder="Deskripsi Kerusakan"
-                value={a_deskripsi}
-                onChange={(e) => setA_Deskripsi(e.target.value)}
-              />
-              <Input
-                placeholder="Tindakan"
-                value={a_tindakan}
-                onChange={(e) => setA_Tindakan(e.target.value)}
-              />
-              <Input
-                placeholder="Penanggung Jawab"
-                value={a_penanggung}
-                onChange={(e) => setA_Penanggung(e.target.value)}
-              />
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Kerusakan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={a_tglKerusakan}
-                  onChange={(e) => setA_TglKerusakan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Pemberitahuan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={a_tglPemberitahuan}
-                  onChange={(e) => setA_TglPemberitahuan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Perbaikan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={a_tglPerbaikan}
-                  onChange={(e) => setA_TglPerbaikan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Perbaikan Selesai
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={a_tglSelesai}
-                  onChange={(e) => setA_TglSelesai(e.target.value)}
-                />
-              </div>
+              <Input placeholder="Nama Unit" value={a_namaUnit} onChange={(e) => setA_NamaUnit(e.target.value)} />
+              <Input placeholder="Deskripsi Kerusakan" value={a_deskripsi} onChange={(e) => setA_Deskripsi(e.target.value)} />
+              <Input placeholder="Tindakan" value={a_tindakan} onChange={(e) => setA_Tindakan(e.target.value)} />
+              <Input placeholder="Penanggung Jawab" value={a_penanggung} onChange={(e) => setA_Penanggung(e.target.value)} />
+              <div><label className="block text-sm font-medium mb-1">Tanggal Kerusakan</label><Input type="datetime-local" value={a_tglKerusakan} onChange={(e) => setA_TglKerusakan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Pemberitahuan</label><Input type="datetime-local" value={a_tglPemberitahuan} onChange={(e) => setA_TglPemberitahuan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Perbaikan</label><Input type="datetime-local" value={a_tglPerbaikan} onChange={(e) => setA_TglPerbaikan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Perbaikan Selesai</label><Input type="datetime-local" value={a_tglSelesai} onChange={(e) => setA_TglSelesai(e.target.value)} /></div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setOpenAdd(false)}>
-                Batal
-              </Button>
+              <Button variant="outline" onClick={() => setOpenAdd(false)}>Batal</Button>
               <Button onClick={handleAdd}>Simpan</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Edit */}
       {openEdit && editing && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-6">
-              Edit Laporan Kerusakan
-            </h2>
-
+            <h2 className="text-xl font-semibold mb-6">Edit Laporan Kerusakan</h2>
             <div className="space-y-3">
-              <Input
-                placeholder="Nama Unit"
-                value={e_namaUnit}
-                onChange={(e) => setE_NamaUnit(e.target.value)}
-              />
-              <Input
-                placeholder="Deskripsi Kerusakan"
-                value={e_deskripsi}
-                onChange={(e) => setE_Deskripsi(e.target.value)}
-              />
-              <Input
-                placeholder="Tindakan"
-                value={e_tindakan}
-                onChange={(e) => setE_Tindakan(e.target.value)}
-              />
-              <Input
-                placeholder="Penanggung Jawab"
-                value={e_penanggung}
-                onChange={(e) => setE_Penanggung(e.target.value)}
-              />
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Kerusakan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={e_tglKerusakan}
-                  onChange={(e) => setE_TglKerusakan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Pemberitahuan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={e_tglPemberitahuan}
-                  onChange={(e) => setE_TglPemberitahuan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Perbaikan
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={e_tglPerbaikan}
-                  onChange={(e) => setE_TglPerbaikan(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Tanggal Perbaikan Selesai
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={e_tglSelesai}
-                  onChange={(e) => setE_TglSelesai(e.target.value)}
-                />
-              </div>
+              <Input placeholder="Nama Unit" value={e_namaUnit} onChange={(e) => setE_NamaUnit(e.target.value)} />
+              <Input placeholder="Deskripsi Kerusakan" value={e_deskripsi} onChange={(e) => setE_Deskripsi(e.target.value)} />
+              <Input placeholder="Tindakan" value={e_tindakan} onChange={(e) => setE_Tindakan(e.target.value)} />
+              <Input placeholder="Penanggung Jawab" value={e_penanggung} onChange={(e) => setE_Penanggung(e.target.value)} />
+              <div><label className="block text-sm font-medium mb-1">Tanggal Kerusakan</label><Input type="datetime-local" value={e_tglKerusakan} onChange={(e) => setE_TglKerusakan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Pemberitahuan</label><Input type="datetime-local" value={e_tglPemberitahuan} onChange={(e) => setE_TglPemberitahuan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Perbaikan</label><Input type="datetime-local" value={e_tglPerbaikan} onChange={(e) => setE_TglPerbaikan(e.target.value)} /></div>
+              <div><label className="block text-sm font-medium mb-1">Tanggal Perbaikan Selesai</label><Input type="datetime-local" value={e_tglSelesai} onChange={(e) => setE_TglSelesai(e.target.value)} /></div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setOpenEdit(false)}>
-                Batal
-              </Button>
+              <Button variant="outline" onClick={() => setOpenEdit(false)}>Batal</Button>
               <Button onClick={handleUpdate}>Update</Button>
             </div>
           </div>

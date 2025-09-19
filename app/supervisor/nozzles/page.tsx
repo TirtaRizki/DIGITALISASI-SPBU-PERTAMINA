@@ -21,6 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 
 interface Tank {
   id: number;
@@ -126,26 +130,17 @@ export default function NozzlesPage() {
       fetchNozzles();
     } catch (err: any) {
       console.error("add nozzle error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal menambah nozzle!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal menambah nozzle!", "error");
     }
   };
 
   const openEditModal = (n: Nozzle) => {
     setEditing(n);
     setE_KodeNozzle(n.kodeNozzle);
-
-    // cari pumpId dari daftar pumps (cocokkan kodePompa)
     const foundPump = pumps.find((p) => p.kodePompa === n.pump.kodePompa);
     setE_PumpId(foundPump ? foundPump.id : "");
-
-    // cari tankId dari daftar tanks (cocokkan fuel_type)
     const foundTank = tanks.find((t) => t.fuel_type === n.tank.fuel_type);
     setE_TankId(foundTank ? foundTank.id : "");
-
     setOpenEdit(true);
   };
 
@@ -169,22 +164,15 @@ export default function NozzlesPage() {
       fetchNozzles();
     } catch (err: any) {
       console.error("update nozzle error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update nozzle!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update nozzle!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin hapus?",
-      text: "Data nozzle akan dihapus permanen",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin hapus?", text: "Data nozzle akan dihapus permanen",
+      icon: "warning", showCancelButton: true,
+      confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
 
@@ -194,39 +182,67 @@ export default function NozzlesPage() {
       fetchNozzles();
     } catch (err: any) {
       console.error("delete nozzle error:", err.response?.data || err.message);
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus nozzle!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus nozzle!", "error");
     }
+  };
+
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (nozzles.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Daftar Nozzles", 105, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 25);
+    
+    const head = [["ID", "Kode Nozzle", "Pompa", "Tank (Fuel Type)", "Dibuat"]];
+    const body = nozzles.map(n => [
+        n.id,
+        n.kodeNozzle,
+        n.pump.kodePompa,
+        n.tank.fuel_type.replace(/_/g, " "),
+        new Date(n.createdAt).toLocaleString('id-ID')
+    ]);
+
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+    });
+
+    doc.save(`Daftar_Nozzles.pdf`);
   };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Daftar Nozzles</h1>
-        <Button onClick={() => setOpenAdd(true)}>+ Tambah Nozzle</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={() => setOpenAdd(true)}>+ Tambah Nozzle</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Nozzles</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Nozzles</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : nozzles.length === 0 ? (
-            <p>Tidak ada data nozzle.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : nozzles.length === 0 ? (<p>Tidak ada data nozzle.</p>) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Kode Nozzle</TableHead>
-                  <TableHead>Pompa</TableHead>
-                  <TableHead>Tank</TableHead>
-                  <TableHead>Aksi</TableHead>
+                  <TableHead>ID</TableHead><TableHead>Kode Nozzle</TableHead><TableHead>Pompa</TableHead>
+                  <TableHead>Tank</TableHead><TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -237,21 +253,8 @@ export default function NozzlesPage() {
                     <TableCell>{n.pump.kodePompa}</TableCell>
                     <TableCell>{n.tank.fuel_type}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditModal(n)}
-                      >
-                        Edit
-                      </Button>
-
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(n.id)}
-                      >
-                        Delete
-                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openEditModal(n)}>Edit</Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(n.id)}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -261,136 +264,80 @@ export default function NozzlesPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
       {openAdd && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg">
             <h2 className="text-xl font-semibold mb-6">Tambah Nozzle</h2>
-
             <div className="space-y-4">
-              {/* Tank */}
               <div>
                 <label className="text-sm font-medium">Tank</label>
-                <Select
-                  value={a_tankId ? String(a_tankId) : ""}
-                  onValueChange={(v) => setA_TankId(Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Tank" />
-                  </SelectTrigger>
+                <Select value={a_tankId ? String(a_tankId) : ""} onValueChange={(v) => setA_TankId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Tank" /></SelectTrigger>
                   <SelectContent>
                     {tanks.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.code_tank || `Tank-${t.id}`} ({t.fuel_type})
-                      </SelectItem>
+                      <SelectItem key={t.id} value={String(t.id)}>{t.code_tank || `Tank-${t.id}`} ({t.fuel_type})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Pump */}
               <div>
                 <label className="text-sm font-medium">Pump</label>
-                <Select
-                  value={a_pumpId ? String(a_pumpId) : ""}
-                  onValueChange={(v) => setA_PumpId(Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Pump" />
-                  </SelectTrigger>
+                <Select value={a_pumpId ? String(a_pumpId) : ""} onValueChange={(v) => setA_PumpId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Pump" /></SelectTrigger>
                   <SelectContent>
                     {pumps.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.kodePompa}
-                      </SelectItem>
+                      <SelectItem key={p.id} value={String(p.id)}>{p.kodePompa}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Kode Nozzle */}
               <div>
                 <label className="text-sm font-medium">Kode Nozzle</label>
-                <Input
-                  value={a_kodeNozzle}
-                  onChange={(e) => setA_KodeNozzle(e.target.value)}
-                  placeholder="Masukkan kode nozzle"
-                />
+                <Input value={a_kodeNozzle} onChange={(e) => setA_KodeNozzle(e.target.value)} placeholder="Masukkan kode nozzle" />
               </div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setOpenAdd(false)}>
-                Batal
-              </Button>
+              <Button variant="outline" onClick={() => setOpenAdd(false)}>Batal</Button>
               <Button onClick={handleAdd}>Simpan</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Edit */}
       {openEdit && editing && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg">
             <h2 className="text-xl font-semibold mb-6">Edit Nozzle</h2>
-
             <div className="space-y-4">
-              {/* Tank */}
               <div>
                 <label className="text-sm font-medium">Tank</label>
-                <Select
-                  value={e_tankId ? String(e_tankId) : ""}
-                  onValueChange={(v) => setE_TankId(Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Tank" />
-                  </SelectTrigger>
+                <Select value={e_tankId ? String(e_tankId) : ""} onValueChange={(v) => setE_TankId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Tank" /></SelectTrigger>
                   <SelectContent>
                     {tanks.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.code_tank || `Tank-${t.id}`} ({t.fuel_type})
-                      </SelectItem>
+                      <SelectItem key={t.id} value={String(t.id)}>{t.code_tank || `Tank-${t.id}`} ({t.fuel_type})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Pump */}
               <div>
                 <label className="text-sm font-medium">Pump</label>
-                <Select
-                  value={e_pumpId ? String(e_pumpId) : ""}
-                  onValueChange={(v) => setE_PumpId(Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Pump" />
-                  </SelectTrigger>
+                <Select value={e_pumpId ? String(e_pumpId) : ""} onValueChange={(v) => setE_PumpId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Pump" /></SelectTrigger>
                   <SelectContent>
                     {pumps.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.kodePompa}
-                      </SelectItem>
+                      <SelectItem key={p.id} value={String(p.id)}>{p.kodePompa}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Kode Nozzle */}
               <div>
                 <label className="text-sm font-medium">Kode Nozzle</label>
-                <Input
-                  value={e_kodeNozzle}
-                  onChange={(e) => setE_KodeNozzle(e.target.value)}
-                  placeholder="Masukkan kode nozzle"
-                />
+                <Input value={e_kodeNozzle} onChange={(e) => setE_KodeNozzle(e.target.value)} placeholder="Masukkan kode nozzle" />
               </div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setOpenEdit(false)}>
-                Batal
-              </Button>
+              <Button variant="outline" onClick={() => setOpenEdit(false)}>Batal</Button>
               <Button onClick={handleUpdate}>Update</Button>
             </div>
           </div>

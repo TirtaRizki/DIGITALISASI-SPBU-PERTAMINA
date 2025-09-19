@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface FuelSale {
   id: number;
@@ -103,7 +106,7 @@ export default function FuelSalesPage() {
     setEditing(fs);
     setForm({
       nozzleId: fs.nozzleId,
-      tanggal: fs.tanggal.slice(0, 16), // cocok untuk datetime-local
+      tanggal: fs.tanggal.slice(0, 16),
       shift: fs.shift,
       standAwal: fs.standAwal,
       standAkhir: fs.standAkhir,
@@ -118,11 +121,7 @@ export default function FuelSalesPage() {
     const hargaPerLiter = Number(form.hargaPerLiter);
 
     if (standAkhir < standAwal) {
-      Swal.fire(
-        "Error",
-        "Stand akhir tidak boleh lebih kecil dari stand awal!",
-        "error"
-      );
+      Swal.fire("Error", "Stand akhir tidak boleh lebih kecil dari stand awal!", "error");
       return null;
     }
 
@@ -152,11 +151,7 @@ export default function FuelSalesPage() {
       setOpenAddModal(false);
       fetchFuelSales();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal tambah data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal tambah data!", "error");
     }
   };
 
@@ -173,22 +168,14 @@ export default function FuelSalesPage() {
       setEditing(null);
       fetchFuelSales();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update data!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin?",
-      text: "Data akan dihapus permanen!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin?", text: "Data akan dihapus permanen!", icon: "warning",
+      showCancelButton: true, confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
     try {
@@ -196,110 +183,109 @@ export default function FuelSalesPage() {
       Swal.fire("Berhasil", "Data berhasil dihapus!", "success");
       fetchFuelSales();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus data!", "error");
     }
+  };
+  
+  const formatRupiah = (value: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency", currency: "IDR", minimumFractionDigits: 0,
+    }).format(value);
+  };
+  
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (fuelSales.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+  
+    const doc = new jsPDF({ orientation: "landscape" });
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Laporan Penjualan BBM (Fuel Sales)", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 25);
+    
+    const head = [["Nozzle", "Tanggal", "Shift", "Stand Awal", "Stand Akhir", "Liter", "Harga/Liter", "Total Harga"]];
+    const body = fuelSales.map(fs => {
+        const nozzle = nozzles.find((n) => n.id === fs.nozzleId);
+        const nozzleName = nozzle ? `${nozzle.kodeNozzle} (${nozzle.tank?.fuel_type || "Unknown"})` : fs.nozzleId;
+        return [
+            nozzleName,
+            new Date(fs.tanggal).toLocaleString('id-ID'),
+            fs.shift,
+            fs.standAwal.toLocaleString('id-ID'),
+            fs.standAkhir.toLocaleString('id-ID'),
+            fs.jumlahLiter.toLocaleString('id-ID'),
+            formatRupiah(fs.hargaPerLiter),
+            formatRupiah(fs.totalHarga)
+        ];
+    });
+  
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+    });
+  
+    doc.save(`Laporan_Fuel_Sales.pdf`);
   };
 
   const renderFormFields = () => (
     <div className="space-y-2">
       <label>Nozzle</label>
-      <select
-        value={form.nozzleId}
-        onChange={(e) => setField("nozzleId", e.target.value)}
-        className="w-full border rounded p-2"
-      >
+      <select value={form.nozzleId} onChange={(e) => setField("nozzleId", e.target.value)} className="w-full border rounded p-2">
         <option value="">-- Pilih Nozzle --</option>
         {nozzles.map((n) => (
-          <option key={n.id} value={n.id}>
-            {n.kodeNozzle} ({n.tank?.fuel_type || "Unknown"})
-          </option>
+          <option key={n.id} value={n.id}>{n.kodeNozzle} ({n.tank?.fuel_type || "Unknown"})</option>
         ))}
       </select>
 
       <label>Tanggal</label>
-      <Input
-        type="datetime-local"
-        value={form.tanggal}
-        onChange={(e) => setField("tanggal", e.target.value)}
-      />
+      <Input type="datetime-local" value={form.tanggal} onChange={(e) => setField("tanggal", e.target.value)} />
 
       <label>Shift</label>
-      <select
-        value={form.shift}
-        onChange={(e) => setField("shift", e.target.value)}
-        className="w-full border rounded p-2"
-      >
+      <select value={form.shift} onChange={(e) => setField("shift", e.target.value)} className="w-full border rounded p-2">
         <option value="">-- Pilih Shift --</option>
-        <option value="pagi">Pagi</option>
-        <option value="siang">Siang</option>
-        <option value="malam">Malam</option>
+        <option value="pagi">Pagi</option><option value="siang">Siang</option><option value="malam">Malam</option>
       </select>
 
       <label>Stand Awal</label>
-      <Input
-        type="number"
-        value={form.standAwal}
-        onChange={(e) => setField("standAwal", e.target.value)}
-      />
-
+      <Input type="number" value={form.standAwal} onChange={(e) => setField("standAwal", e.target.value)} />
       <label>Stand Akhir</label>
-      <Input
-        type="number"
-        value={form.standAkhir}
-        onChange={(e) => setField("standAkhir", e.target.value)}
-      />
-
+      <Input type="number" value={form.standAkhir} onChange={(e) => setField("standAkhir", e.target.value)} />
       <label>Harga Per Liter</label>
-      <Input
-        type="number"
-        value={form.hargaPerLiter}
-        onChange={(e) => setField("hargaPerLiter", e.target.value)}
-      />
+      <Input type="number" value={form.hargaPerLiter} onChange={(e) => setField("hargaPerLiter", e.target.value)} />
     </div>
   );
-  
-  // helper format rupiah
-  const formatRupiah = (value: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Fuel Sales</h1>
-        <Button onClick={openAdd}>+ Tambah Data</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={openAdd}>+ Tambah Data</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Fuel Sales</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Fuel Sales</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : fuelSales.length === 0 ? (
-            <p>Belum ada data fuel sales.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : fuelSales.length === 0 ? (<p>Belum ada data fuel sales.</p>) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nozzle</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Shift</TableHead>
-                  <TableHead>Stand Awal</TableHead>
-                  <TableHead>Stand Akhir</TableHead>
-                  <TableHead>Liter</TableHead>
-                  <TableHead>Harga/Liter</TableHead>
-                  <TableHead>Total Harga</TableHead>
-                  <TableHead>Aksi</TableHead>
+                  <TableHead>Nozzle</TableHead><TableHead>Tanggal</TableHead><TableHead>Shift</TableHead>
+                  <TableHead>Stand Awal</TableHead><TableHead>Stand Akhir</TableHead><TableHead>Liter</TableHead>
+                  <TableHead>Harga/Liter</TableHead><TableHead>Total Harga</TableHead><TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -307,38 +293,17 @@ export default function FuelSalesPage() {
                   const nozzle = nozzles.find((n) => n.id === fs.nozzleId);
                   return (
                     <TableRow key={fs.id}>
-                      <TableCell>
-                        {nozzle
-                          ? `${nozzle.kodeNozzle} (${
-                              nozzle.tank?.fuel_type || "Unknown"
-                            })`
-                          : fs.nozzleId}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(fs.tanggal).toLocaleString()}
-                      </TableCell>
+                      <TableCell>{nozzle ? `${nozzle.kodeNozzle} (${nozzle.tank?.fuel_type || "Unknown"})` : fs.nozzleId}</TableCell>
+                      <TableCell>{new Date(fs.tanggal).toLocaleString()}</TableCell>
                       <TableCell>{fs.shift}</TableCell>
                       <TableCell>{fs.standAwal}</TableCell>
                       <TableCell>{fs.standAkhir}</TableCell>
                       <TableCell>{fs.jumlahLiter}</TableCell>
                       <TableCell>{formatRupiah(fs.hargaPerLiter)}</TableCell>
                       <TableCell>{formatRupiah(fs.totalHarga)}</TableCell>
-
                       <TableCell className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEdit(fs)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(fs.id)}
-                        >
-                          Delete
-                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => openEdit(fs)}>Edit</Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(fs.id)}>Delete</Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -349,43 +314,8 @@ export default function FuelSalesPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
-      {openAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Tambah Fuel Sale</h2>
-            {renderFormFields()}
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setOpenAddModal(false)}>
-                Batal
-              </Button>
-              <Button onClick={handleAdd}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edit */}
-      {openEditModal && editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-            <h2 className="text-xl font-semibold mb-4">Edit Fuel Sale</h2>
-            {renderFormFields()}
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOpenEditModal(false);
-                  setEditing(null);
-                }}
-              >
-                Batal
-              </Button>
-              <Button onClick={handleUpdate}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {openAddModal && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50"><div className="bg-white rounded-2xl p-6 w-full max-w-lg"><h2 className="text-xl font-semibold mb-4">Tambah Fuel Sale</h2>{renderFormFields()}<div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setOpenAddModal(false)}>Batal</Button><Button onClick={handleAdd}>Simpan</Button></div></div></div>)}
+      {openEditModal && editing && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50"><div className="bg-white rounded-2xl p-6 w-full max-w-lg"><h2 className="text-xl font-semibold mb-4">Edit Fuel Sale</h2>{renderFormFields()}<div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => { setOpenEditModal(false); setEditing(null); }}>Batal</Button><Button onClick={handleUpdate}>Simpan</Button></div></div></div>)}
     </div>
   );
 }

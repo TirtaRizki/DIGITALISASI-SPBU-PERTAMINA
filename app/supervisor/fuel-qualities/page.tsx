@@ -21,11 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// --- TAMBAHAN BARU ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Tank {
   id: number;
-  code_tank: string;
   fuel_type: string;
+  code_tank?: string;
   spbu?: { code_spbu?: string };
 }
 
@@ -107,64 +110,44 @@ export default function FuelQualitiesPage() {
     setEditing(f);
     setForm({
       ...f,
-      tankId: f.tankId, // ✅ simpan tankId langsung
-      tanggal: f.tanggal.slice(0, 16), // untuk datetime-local
+      tankId: f.tankId,
+      tanggal: f.tanggal.slice(0, 16),
     });
     setOpenEditModal(true);
   };
 
   const handleAdd = async () => {
     try {
-      const payload = {
-        ...form,
-        tankId: Number(form.tankId), // ✅ kirim hanya tankId
-        tanggal: new Date(form.tanggal).toISOString(),
-      };
-      delete payload.tank; // ✅ hapus object tank kalau ada
+      const payload = { ...form, tankId: Number(form.tankId), tanggal: new Date(form.tanggal).toISOString() };
+      delete payload.tank;
       await API.post("/supervisor/fuel-qualities", payload);
       Swal.fire("Berhasil", "Fuel Quality berhasil ditambahkan!", "success");
       setOpenAddModal(false);
       fetchFuelQualities();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal tambah data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal tambah data!", "error");
     }
   };
 
   const handleUpdate = async () => {
     if (!editing) return;
     try {
-      const payload = {
-        ...form,
-        tankId: Number(form.tankId), // ✅ kirim hanya tankId
-        tanggal: new Date(form.tanggal).toISOString(),
-      };
-      delete payload.tank; // ✅ hapus object tank kalau ada
+      const payload = { ...form, tankId: Number(form.tankId), tanggal: new Date(form.tanggal).toISOString() };
+      delete payload.tank;
       await API.put(`/supervisor/fuel-qualities/${editing.id}`, payload);
       Swal.fire("Berhasil", "Fuel Quality berhasil diupdate!", "success");
       setOpenEditModal(false);
       setEditing(null);
       fetchFuelQualities();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal update data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal update data!", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     const confirm = await Swal.fire({
-      title: "Yakin?",
-      text: "Data akan dihapus permanen!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, hapus!",
-      cancelButtonText: "Batal",
+      title: "Yakin?", text: "Data akan dihapus permanen!", icon: "warning",
+      showCancelButton: true, confirmButtonText: "Ya, hapus!", cancelButtonText: "Batal",
     });
     if (!confirm.isConfirmed) return;
     try {
@@ -172,181 +155,75 @@ export default function FuelQualitiesPage() {
       Swal.fire("Berhasil", "Data berhasil dihapus!", "success");
       fetchFuelQualities();
     } catch (err: any) {
-      Swal.fire(
-        "Error",
-        err.response?.data?.message || "Gagal hapus data!",
-        "error"
-      );
+      Swal.fire("Error", err.response?.data?.message || "Gagal hapus data!", "error");
     }
+  };
+
+  // --- TAMBAHAN BARU: Fungsi Ekspor PDF ---
+  const handleExportPDF = () => {
+    if (fuelQualities.length === 0) {
+      Swal.fire("Info", "Tidak ada data untuk diekspor!", "info");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const spbu = fuelQualities[0]?.tank.spbu.code_spbu || "N/A";
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Laporan Kualitas BBM (Fuel Quality)", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`SPBU: ${spbu}`, 14, 25);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, doc.internal.pageSize.getWidth() - 14, 25, { align: 'right' });
+
+    const head = [["Tank", "Tanggal", "No Mobil", "Density Obs.", "Suhu Obs.", "Density Std.", "Tinggi Air", "Density PNBP", "Selisih Density"]];
+    const body = fuelQualities.map(f => [
+        `${f.tank.code_tank} (${f.tank.fuel_type.replace(/_/g, " ")})`,
+        new Date(f.tanggal).toLocaleString('id-ID'),
+        f.noMobilTangki,
+        f.densityObserved,
+        f.suhuObserved,
+        f.densityStd,
+        f.tinggiAirTangkiPendam,
+        f.densityStdPnbp,
+        f.selisihDensity
+    ]);
+    
+    autoTable(doc, {
+      head: head,
+      body: body,
+      startY: 30,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fontStyle: 'bold', fillColor: [41, 128, 185], textColor: 255 },
+    });
+    
+    doc.save(`Laporan_Fuel_Quality_${spbu}.pdf`);
   };
 
   const renderFormFields = () => (
     <>
-      <div>
-        <label>Tank</label>
-        <Select
-          value={form.tankId ? String(form.tankId) : ""}
-          onValueChange={(v) => setField("tankId", Number(v))}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Pilih Tank" />
-          </SelectTrigger>
-          <SelectContent>
-            {tanks.map((t) => (
-              <SelectItem key={t.id} value={String(t.id)}>
-                {t.code_tank} ({t.fuel_type}) - {t.spbu?.code_spbu}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <label>Tanggal</label>
-        <Input
-          type="datetime-local"
-          value={form.tanggal || ""}
-          onChange={(e) => setField("tanggal", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Jam Sebelum Penerimaan</label>
-        <Input
-          value={form.jamSebelumPenerimaan || ""}
-          onChange={(e) => setField("jamSebelumPenerimaan", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Density Observed</label>
-        <Input
-          type="number"
-          value={form.densityObserved || ""}
-          onChange={(e) => setField("densityObserved", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Suhu Observed</label>
-        <Input
-          type="number"
-          value={form.suhuObserved || ""}
-          onChange={(e) => setField("suhuObserved", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Density Std</label>
-        <Input
-          type="number"
-          value={form.densityStd || ""}
-          onChange={(e) => setField("densityStd", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Tinggi Air Tangki</label>
-        <Input
-          type="number"
-          value={form.tinggiAirTangkiPendam || ""}
-          onChange={(e) => setField("tinggiAirTangkiPendam", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Jam Penerimaan</label>
-        <Input
-          value={form.jamPenerimaan || ""}
-          onChange={(e) => setField("jamPenerimaan", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>No Mobil Tangki</label>
-        <Input
-          value={form.noMobilTangki || ""}
-          onChange={(e) => setField("noMobilTangki", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>No PNBP</label>
-        <Input
-          value={form.noPnbp || ""}
-          onChange={(e) => setField("noPnbp", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Density Std PNBP</label>
-        <Input
-          type="number"
-          value={form.densityStdPnbp || ""}
-          onChange={(e) => setField("densityStdPnbp", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Density Observed Penerimaan</label>
-        <Input
-          type="number"
-          value={form.densityObservedPenerimaan || ""}
-          onChange={(e) =>
-            setField("densityObservedPenerimaan", e.target.value)
-          }
-        />
-      </div>
-      <div>
-        <label>suhu Observed Penerimaan</label>
-        <Input
-          type="number"
-          value={form.suhuObservedPenerimaan || ""}
-          onChange={(e) => setField("suhuObservedPenerimaan", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>density Std Penerimaan</label>
-        <Input
-          type="number"
-          value={form.densityStdPenerimaan || ""}
-          onChange={(e) => setField("densityStdPenerimaan", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Selisih Density</label>
-        <Input
-          type="number"
-          value={form.selisihDensity || ""}
-          onChange={(e) => setField("selisihDensity", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Jam Pasca Penerimaan</label>
-        <Input
-          value={form.jamPascaPenerimaan || ""}
-          onChange={(e) => setField("jamPascaPenerimaan", e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Density Observed Pasca Penerimaan</label>
-        <Input
-          type="number"
-          value={form.densityObservedPascaPenerimaan || ""}
-          onChange={(e) =>
-            setField("densityObservedPascaPenerimaan", e.target.value)
-          }
-        />
-      </div>
-      <div>
-        <label>Suhu Observed Pasca Penerimaan</label>
-        <Input
-          type="number"
-          value={form.suhuObservedPascaPenerimaan || ""}
-          onChange={(e) =>
-            setField("suhuObservedPascaPenerimaan", e.target.value)
-          }
-        />
-      </div>
-      <div>
-        <label>Density Std Pasca Penerimaan</label>
-        <Input
-          type="number"
-          value={form.densityStdPascaPenerimaan || ""}
-          onChange={(e) =>
-            setField("densityStdPascaPenerimaan", e.target.value)
-          }
-        />
-      </div>
+      <div><label>Tank</label><Select value={form.tankId ? String(form.tankId) : ""} onValueChange={(v) => setField("tankId", Number(v))}><SelectTrigger><SelectValue placeholder="Pilih Tank" /></SelectTrigger><SelectContent>{tanks.map((t) => (<SelectItem key={t.id} value={String(t.id)}>{t.code_tank} ({t.fuel_type}) - {t.spbu?.code_spbu}</SelectItem>))}</SelectContent></Select></div>
+      <div><label>Tanggal</label><Input type="datetime-local" value={form.tanggal || ""} onChange={(e) => setField("tanggal", e.target.value)} /></div>
+      <div><label>Jam Sebelum Penerimaan</label><Input value={form.jamSebelumPenerimaan || ""} onChange={(e) => setField("jamSebelumPenerimaan", e.target.value)} /></div>
+      <div><label>Density Observed</label><Input type="number" value={form.densityObserved || ""} onChange={(e) => setField("densityObserved", e.target.value)} /></div>
+      <div><label>Suhu Observed</label><Input type="number" value={form.suhuObserved || ""} onChange={(e) => setField("suhuObserved", e.target.value)} /></div>
+      <div><label>Density Std</label><Input type="number" value={form.densityStd || ""} onChange={(e) => setField("densityStd", e.target.value)} /></div>
+      <div><label>Tinggi Air Tangki</label><Input type="number" value={form.tinggiAirTangkiPendam || ""} onChange={(e) => setField("tinggiAirTangkiPendam", e.target.value)} /></div>
+      <div><label>Jam Penerimaan</label><Input value={form.jamPenerimaan || ""} onChange={(e) => setField("jamPenerimaan", e.target.value)} /></div>
+      <div><label>No Mobil Tangki</label><Input value={form.noMobilTangki || ""} onChange={(e) => setField("noMobilTangki", e.target.value)} /></div>
+      <div><label>No PNBP</label><Input value={form.noPnbp || ""} onChange={(e) => setField("noPnbp", e.target.value)} /></div>
+      <div><label>Density Std PNBP</label><Input type="number" value={form.densityStdPnbp || ""} onChange={(e) => setField("densityStdPnbp", e.target.value)} /></div>
+      <div><label>Density Observed Penerimaan</label><Input type="number" value={form.densityObservedPenerimaan || ""} onChange={(e) => setField("densityObservedPenerimaan", e.target.value)} /></div>
+      <div><label>Suhu Observed Penerimaan</label><Input type="number" value={form.suhuObservedPenerimaan || ""} onChange={(e) => setField("suhuObservedPenerimaan", e.target.value)} /></div>
+      <div><label>Density Std Penerimaan</label><Input type="number" value={form.densityStdPenerimaan || ""} onChange={(e) => setField("densityStdPenerimaan", e.target.value)} /></div>
+      <div><label>Selisih Density</label><Input type="number" value={form.selisihDensity || ""} onChange={(e) => setField("selisihDensity", e.target.value)} /></div>
+      <div><label>Jam Pasca Penerimaan</label><Input value={form.jamPascaPenerimaan || ""} onChange={(e) => setField("jamPascaPenerimaan", e.target.value)} /></div>
+      <div><label>Density Observed Pasca Penerimaan</label><Input type="number" value={form.densityObservedPascaPenerimaan || ""} onChange={(e) => setField("densityObservedPascaPenerimaan", e.target.value)} /></div>
+      <div><label>Suhu Observed Pasca Penerimaan</label><Input type="number" value={form.suhuObservedPascaPenerimaan || ""} onChange={(e) => setField("suhuObservedPascaPenerimaan", e.target.value)} /></div>
+      <div><label>Density Std Pasca Penerimaan</label><Input type="number" value={form.densityStdPascaPenerimaan || ""} onChange={(e) => setField("densityStdPascaPenerimaan", e.target.value)} /></div>
     </>
   );
 
@@ -354,28 +231,22 @@ export default function FuelQualitiesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Fuel Qualities</h1>
-        <Button onClick={openAdd}>+ Tambah Data</Button>
+        {/* --- TOMBOL EKSPOR DITAMBAHKAN --- */}
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportPDF}>Export PDF</Button>
+            <Button onClick={openAdd}>+ Tambah Data</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Data Fuel Qualities</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Data Fuel Qualities</CardTitle></CardHeader>
         <CardContent>
-          {loading ? (
-            <p>Loading...</p>
-          ) : fuelQualities.length === 0 ? (
-            <p>Belum ada data fuel qualities.</p>
-          ) : (
+          {loading ? (<p>Loading...</p>) : fuelQualities.length === 0 ? (<p>Belum ada data fuel qualities.</p>) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Tank</TableHead>
-                  <TableHead>SPBU</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Density Obs</TableHead>
-                  <TableHead>Selisih Density</TableHead>
+                  <TableHead>ID</TableHead><TableHead>Tank</TableHead><TableHead>SPBU</TableHead>
+                  <TableHead>Tanggal</TableHead><TableHead>Density Obs</TableHead><TableHead>Selisih Density</TableHead>
                   <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -383,30 +254,14 @@ export default function FuelQualitiesPage() {
                 {fuelQualities.map((f) => (
                   <TableRow key={f.id}>
                     <TableCell>{f.id}</TableCell>
-                    <TableCell>
-                      {f.tank.code_tank} ({f.tank.fuel_type})
-                    </TableCell>
+                    <TableCell>{f.tank.code_tank} ({f.tank.fuel_type})</TableCell>
                     <TableCell>{f.tank.spbu.code_spbu}</TableCell>
-                    <TableCell>
-                      {new Date(f.tanggal).toLocaleString()}
-                    </TableCell>
+                    <TableCell>{new Date(f.tanggal).toLocaleString()}</TableCell>
                     <TableCell>{f.densityObserved}</TableCell>
                     <TableCell>{f.selisihDensity}</TableCell>
                     <TableCell className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(f)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDelete(f.id)}
-                      >
-                        Delete
-                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openEdit(f)}>Edit</Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(f.id)}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -416,47 +271,8 @@ export default function FuelQualitiesPage() {
         </CardContent>
       </Card>
 
-      {/* Modal Tambah */}
-      {openAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl">
-            <h2 className="text-xl font-semibold mb-4">Tambah Fuel Quality</h2>
-            <div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
-              {renderFormFields()}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setOpenAddModal(false)}>
-                Batal
-              </Button>
-              <Button onClick={handleAdd}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Edit */}
-      {openEditModal && editing && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl">
-            <h2 className="text-xl font-semibold mb-4">Edit Fuel Quality</h2>
-            <div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
-              {renderFormFields()}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOpenEditModal(false);
-                  setEditing(null);
-                }}
-              >
-                Batal
-              </Button>
-              <Button onClick={handleUpdate}>Simpan</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {openAddModal && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto"><div className="bg-white rounded-2xl p-6 w-full max-w-4xl"><h2 className="text-xl font-semibold mb-4">Tambah Fuel Quality</h2><div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">{renderFormFields()}</div><div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setOpenAddModal(false)}>Batal</Button><Button onClick={handleAdd}>Simpan</Button></div></div></div>)}
+      {openEditModal && editing && (<div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 overflow-y-auto"><div className="bg-white rounded-2xl p-6 w-full max-w-4xl"><h2 className="text-xl font-semibold mb-4">Edit Fuel Quality</h2><div className="grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">{renderFormFields()}</div><div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => { setOpenEditModal(false); setEditing(null); }}>Batal</Button><Button onClick={handleUpdate}>Simpan</Button></div></div></div>)}
     </div>
   );
 }
